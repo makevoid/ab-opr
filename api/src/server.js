@@ -16,7 +16,7 @@ const {
   errorHandler
 } = require('./middleware')
 
-const { web3, contracts } = require('./util/web3')
+const { web3 } = require('./util/web3')
 
 const { healthcheck } = require('./healthcheck')
 
@@ -24,7 +24,7 @@ const createServer = async _ => {
 
   logger.debug('Creating server...')
 
-  const [ from ] = await web3.eth.getAccounts()
+  //const [ from ] = await web3.eth.getAccounts()
 
   const app = new Koa()
   app

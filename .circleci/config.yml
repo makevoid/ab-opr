@@ -10,14 +10,6 @@ defaults:
       docker:
         - image: circleci/node:10
       working_directory: /tmp/build_space/git_repo
-  - &job-with-parity
-      docker:
-        - image: circleci/node:10
-        - image: appliedblockchain/parity-solo-instant:latest
-          auth:
-            username: abbuilder
-            password: $DOCKER_PASSWORD
-      working_directory: /tmp/build_space/git_repo
   - &workflow
       context: org-global
   - &workflow-master-only
@@ -27,16 +19,10 @@ defaults:
           only:
             - master
 
-parity-image: &parity-image
-  image: appliedblockchain/parity-solo
-  auth:
-    username: $DOCKER_USER
-    password: $DOCKER_PASSWORD
-
 jobs:
   pre-build:
     docker:
-      - image: circleci/node:10
+      - image: circleci/node:12
     steps:
       - run: mkdir build_space
       - add_ssh_keys
@@ -46,47 +32,6 @@ jobs:
           root: /tmp/build_space
           paths:
             - git_repo
-
-  contracts:
-    <<: *job
-    steps:
-      - *attach_workspace
-      - restore_cache:
-          keys:
-            - v1-contracts-{{ checksum "contracts/package.json" }}
-            - solc-v2-0.5.0
-      - run:
-          name: Install solc
-          command: |-
-            if [ ! -e solc-static-linux ]; then
-              wget https://github.com/ethereum/solidity/releases/download/v0.5.0/solc-static-linux
-            fi
-            chmod +x solc-static-linux
-            sudo mv solc-static-linux /usr/bin/solc
-      - save_cache:
-          key: solc-v2-0.5.0
-          paths:
-            - solc-static-linux
-      - run:
-          name: install dependencies
-          command: |-
-            cd contracts
-            echo "//registry.npmjs.org/:_authToken=$PRIVATE_NPM_TOKEN" > .npmrc && npm i
-      - run:
-          name: lint
-          command: |-
-            cd contracts
-            npm run lint
-      - run:
-          name: Test
-          command: |-
-            cd contracts
-            npm run version
-            npm test
-      - save_cache:
-          key: v1-contracts-{{ checksum "contracts/package.json" }}
-          paths:
-            - contracts/node_modules
 
   react:
     <<: *job
@@ -125,32 +70,19 @@ jobs:
       - run:
           name: build
           command: |-
-            docker-compose -f docker-compose.yml -f react/e2e/compose-integration.yml build --build-arg NPM_TOKEN=$PRIVATE_NPM_TOKEN api react e2e parity1 parity2 parity3
+            docker-compose -f docker-compose.yml -f react/e2e/compose-integration.yml build --build-arg NPM_TOKEN=$PRIVATE_NPM_TOKEN api react e2e
       - run:
           name: start the test stack
           command: |-
-            docker-compose  -f docker-compose.yml -f react/e2e/compose-integration.yml up -d api react parity1 parity2 parity3 discovery e2e
+            docker-compose  -f docker-compose.yml -f react/e2e/compose-integration.yml up -d api react discovery e2e
       - run:
           name: Run the puppeteer tests
           command: docker-compose -f docker-compose.yml -f react/e2e/compose-integration.yml exec e2e npm run test:ci
 
   api:
-    <<: *job-with-parity
+    <<: *job
     steps:
       - *attach_workspace
-      - restore_cache:
-          keys:
-            - v1-api-{{ checksum "api/package.json" }}
-            - v1-contracts-{{ checksum "contracts/package.json" }}
-            - solc-v2-0.5.0
-      - run:
-          name: Install solc
-          command: |-
-            if [ ! -e solc-static-linux ]; then
-              wget https://github.com/ethereum/solidity/releases/download/v0.5.0/solc-static-linux
-            fi
-            chmod +x solc-static-linux
-            sudo mv solc-static-linux /usr/bin/solc
       - run:
           name: install dependencies
           command: |-
@@ -160,15 +92,6 @@ jobs:
           command: |-
             cd api
             npm run lint
-      - run:
-          name: npm install
-          command: |-
-            cd contracts
-            npm i
-      - run:
-          name: compile & deploy contracts
-          command: |-
-            cd contracts && npm run compile && npm run deploy
       - run:
           name: unit test api
           command: |-
@@ -190,14 +113,10 @@ workflows:
     jobs:
       - pre-build:
           <<: *workflow
-      - contracts:
-          <<: *workflow
-          requires:
-            - pre-build
       - api:
           <<: *workflow
           requires:
-            - contracts
+            - pre-build
       - react:
           <<: *workflow
           requires:

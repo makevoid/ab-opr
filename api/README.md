@@ -44,16 +44,7 @@ npm i
 npm run start
 ```
 
-### Extra info:
 
-For details of how the contract is auto-deployed, please check the npm scripts in package.json.
-
-Or, to manually deploy the contracts and start in production mode:
-
-```
-export CONTRACT_ADDRESSES=$(node ./bin/deployContract.js store-contract)
-npm run start
-```
 
 ### Linting and running tests
 

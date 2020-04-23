@@ -55,7 +55,4 @@ CTR_ADDR_PATH=../contracts/build/contractAddresses.json
 
 set +ex
 
-echo 'Loading contracts addresses in env'
-export CONTRACT_ADDRESSES=$(cat $CTR_ADDR_PATH)
-
 env COMPOSE_PROJECT_NAME="lauchpad" NPM_TOKEN="$npmToken" docker-compose $configArgs $@

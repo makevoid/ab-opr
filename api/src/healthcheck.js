@@ -39,6 +39,8 @@ const getCommitHash = async () => {
   return hash.toString().trim()
 }
 
+// TODO: check redis
+//
 // NOTE: Install knex and pg and uncomment to check the availabilitu of a postgres database
 //
 // const config = require('config')

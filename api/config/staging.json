@@ -1,0 +1,7 @@
+{
+  "PORT": 3000,
+  "NODE_ENV": "staging",
+  "ETHEREUM_JSONRPC_ENDPOINT": "http://parity1:8545",
+  "ELASTICSEARCH": "elasticsearch",
+  "LOG_LEVEL": "info"
+}

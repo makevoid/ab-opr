@@ -1,0 +1,192 @@
+version: "3.6"
+
+networks:
+  main:
+
+services:
+  api:
+    hostname: launchpad-api
+    image: appliedblockchain/launchpad-api:latest
+    build:
+      context: .
+      dockerfile: ./api/Dockerfile
+      args:
+        - NPM_TOKEN
+    environment:
+      - NODE_ENV=staging
+      - PROVIDER=http://parity1:8545
+      # TODO: change Sentry DSN with the correct sentry DSN
+      - SENTRY_DSN=http://6f20a6d7d8154e1f93593c634f943f7d@sentry-web:9000/3
+      - FORCE_COLOR=1
+    networks:
+      - main
+    ports:
+      - 3000:3000
+    depends_on:
+      - parity1
+      - parity2
+      - parity3
+    deploy: &deploy_defaults
+      replicas: 3
+      update_config:
+        parallelism: 1
+        delay: 1s
+      restart_policy: &restart_policy
+        condition: any
+        delay: 5s
+        max_attempts: 10
+        window: 60s
+
+  react:
+    hostname: launchpad-react
+    image: appliedblockchain/launchpad-react:latest
+    build:
+      context: ./react
+      args:
+        - NPM_TOKEN
+        - BASIC_AUTH_HTPASSWD=admin:$$apr1$$6SESoef2$$haXLi9RTR.MOe76pJGH8r.
+        - TEST_MODE # if set, the react app will be built to use localhost as a backend
+    ports:
+      - 80:80
+    networks:
+      - main
+    deploy:
+      <<: *deploy_defaults
+      mode: global
+    depends_on:
+      - api
+
+  explorer:
+    hostname: launchpad-explorer
+    image: appliedblockchain/launchpad-explorer:latest
+    build:
+      context: ./explorer
+    environment:
+      ETHEREUM_JSONRPC_ENDPOINT: http://parity1:8545/
+      # CONFIG_URL: http://api:3000/api/block-explorer-config
+    networks:
+      - main
+    ports:
+      - 3001:3000
+    depends_on:
+      - parity1
+    deploy:
+      mode: global
+      restart_policy:
+        <<: *restart_policy
+  parity1:
+    hostname: launchpad-parity1
+    build:
+      context: ./stack
+      dockerfile: Dockerfile-parity
+      args:
+        - PARITY_ID=1
+        - NPM_TOKEN
+        - S3_ACCESS_KEY_ID
+        - S3_SECRET_ACCESS_KEY
+        - S3_BUCKET_NAME
+    environment:
+      - PARITY_ID=1
+    networks:
+    - main
+    ports:
+      - 8180:8180
+      - 8545:8545
+      - 8546:8546
+      - 30303:30303
+    image: appliedblockchain/launchpad-parity1:latest
+    volumes:
+      - parity1_data:/parity/data
+    depends_on:
+      - discovery
+    deploy:
+      <<: *deploy_defaults
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.node_id == 1
+
+  parity2:
+    hostname: launchpad-parity2
+    build:
+      context: ./stack
+      dockerfile: Dockerfile-parity
+      args:
+        - PARITY_ID=2
+        - NPM_TOKEN
+    environment:
+      - PARITY_ID=2
+    networks:
+      - main
+    image: appliedblockchain/launchpad-parity2:latest
+    volumes:
+      - parity2_data:/parity/data
+    depends_on:
+      - discovery
+    deploy:
+      <<: *deploy_defaults
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.node_id == 2
+
+  parity3:
+    hostname: launchpad-parity3
+    build:
+      context: ./stack
+      dockerfile: Dockerfile-parity
+      args:
+        - PARITY_ID=3
+        - NPM_TOKEN
+    environment:
+      - PARITY_ID=3
+    networks:
+       - main
+    image: appliedblockchain/launchpad-parity3:latest
+    volumes:
+      - parity3_data:/parity/data
+    depends_on:
+      - discovery
+    deploy:
+      <<: *deploy_defaults
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.node_id == 2
+
+  discovery:
+    hostname: discovery
+    image: redis
+    ports:
+      - 6379:6379
+    networks:
+    - main
+    volumes:
+      - discovery:/data
+    deploy:
+      <<: *deploy_defaults
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.node_id == 1
+
+  # logspout:
+  #   image: gliderlabs/logspout
+  #   deploy:
+  #     mode: global
+  #   environment:
+  #     - SYSLOG_HOST=logs.papertrailapp.com:12345
+  #     # NOTE: you have to change the papertrail url with the correct one
+  #   command: syslog+tls://$$SYSLOG_HOST
+  #   networks:
+  #     - main
+  #   volumes:
+  #     - type: bind
+  #       target: /var/run/docker.sock
+  #       source: /var/run/docker.sock
+
+volumes:
+  discovery:
+  parity1_data:
+  parity2_data:
+  parity3_data:

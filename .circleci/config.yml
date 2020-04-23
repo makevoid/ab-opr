@@ -1,0 +1,210 @@
+version: 2.1
+
+defaults:
+  - &attach_workspace
+      attach_workspace:
+        at: /tmp/build_space/
+  - &docker_login
+      run: docker login -u abbuilder -p "$DOCKER_PASSWORD"
+  - &job
+      docker:
+        - image: circleci/node:10
+      working_directory: /tmp/build_space/git_repo
+  - &job-with-parity
+      docker:
+        - image: circleci/node:10
+        - image: appliedblockchain/parity-solo-instant:latest
+          auth:
+            username: abbuilder
+            password: $DOCKER_PASSWORD
+      working_directory: /tmp/build_space/git_repo
+  - &workflow
+      context: org-global
+  - &workflow-master-only
+      context: org-global
+      filters:
+        branches:
+          only:
+            - master
+
+parity-image: &parity-image
+  image: appliedblockchain/parity-solo
+  auth:
+    username: $DOCKER_USER
+    password: $DOCKER_PASSWORD
+
+jobs:
+  pre-build:
+    docker:
+      - image: circleci/node:10
+    steps:
+      - run: mkdir build_space
+      - add_ssh_keys
+      - checkout:
+          path: /tmp/build_space/git_repo
+      - persist_to_workspace:
+          root: /tmp/build_space
+          paths:
+            - git_repo
+
+  contracts:
+    <<: *job
+    steps:
+      - *attach_workspace
+      - restore_cache:
+          keys:
+            - v1-contracts-{{ checksum "contracts/package.json" }}
+            - solc-v2-0.5.0
+      - run:
+          name: Install solc
+          command: |-
+            if [ ! -e solc-static-linux ]; then
+              wget https://github.com/ethereum/solidity/releases/download/v0.5.0/solc-static-linux
+            fi
+            chmod +x solc-static-linux
+            sudo mv solc-static-linux /usr/bin/solc
+      - save_cache:
+          key: solc-v2-0.5.0
+          paths:
+            - solc-static-linux
+      - run:
+          name: install dependencies
+          command: |-
+            cd contracts
+            echo "//registry.npmjs.org/:_authToken=$PRIVATE_NPM_TOKEN" > .npmrc && npm i
+      - run:
+          name: lint
+          command: |-
+            cd contracts
+            npm run lint
+      - run:
+          name: Test
+          command: |-
+            cd contracts
+            npm run version
+            npm test
+      - save_cache:
+          key: v1-contracts-{{ checksum "contracts/package.json" }}
+          paths:
+            - contracts/node_modules
+
+  react:
+    <<: *job
+    steps:
+      - *attach_workspace
+      - restore_cache:
+          keys:
+            - v1-react-{{ checksum "react/package.json" }}
+      - run:
+          name: install dependencies
+          command: |-
+            cd react
+            echo "//registry.npmjs.org/:_authToken=$PRIVATE_NPM_TOKEN" > .npmrc && npm i
+      - run:
+          name: lint
+          command: |-
+            cd react
+            npm run lint
+      - run:
+          name: Test
+          command: |-
+            cd react
+            npm run test:ci
+      - save_cache:
+          key: v1-react-{{ checksum "react/package.json" }}
+          paths:
+            - react/node_modules
+
+  e2e:
+    <<: *job
+    steps:
+      - *attach_workspace
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - *docker_login
+      - run:
+          name: build
+          command: |-
+            docker-compose -f docker-compose.yml -f react/e2e/compose-integration.yml build --build-arg NPM_TOKEN=$PRIVATE_NPM_TOKEN api react e2e parity1 parity2 parity3
+      - run:
+          name: start the test stack
+          command: |-
+            docker-compose  -f docker-compose.yml -f react/e2e/compose-integration.yml up -d api react parity1 parity2 parity3 discovery e2e
+      - run:
+          name: Run the puppeteer tests
+          command: docker-compose -f docker-compose.yml -f react/e2e/compose-integration.yml exec e2e npm run test:ci
+
+  api:
+    <<: *job-with-parity
+    steps:
+      - *attach_workspace
+      - restore_cache:
+          keys:
+            - v1-api-{{ checksum "api/package.json" }}
+            - v1-contracts-{{ checksum "contracts/package.json" }}
+            - solc-v2-0.5.0
+      - run:
+          name: Install solc
+          command: |-
+            if [ ! -e solc-static-linux ]; then
+              wget https://github.com/ethereum/solidity/releases/download/v0.5.0/solc-static-linux
+            fi
+            chmod +x solc-static-linux
+            sudo mv solc-static-linux /usr/bin/solc
+      - run:
+          name: install dependencies
+          command: |-
+            cd api && echo "//registry.npmjs.org/:_authToken=$PRIVATE_NPM_TOKEN" > .npmrc && npm i
+      - run:
+          name: lint
+          command: |-
+            cd api
+            npm run lint
+      - run:
+          name: npm install
+          command: |-
+            cd contracts
+            npm i
+      - run:
+          name: compile & deploy contracts
+          command: |-
+            cd contracts && npm run compile && npm run deploy
+      - run:
+          name: unit test api
+          command: |-
+            cd api
+            npm run test:ci
+      - run:
+          name: integration test api
+          command: |-
+            cd api
+            npm run test:integration:ci
+      - save_cache:
+          key: v1-api-{{ checksum "api/package.json" }}
+          paths:
+            - api/node_modules
+
+workflows:
+  version: 2
+  deploy:
+    jobs:
+      - pre-build:
+          <<: *workflow
+      - contracts:
+          <<: *workflow
+          requires:
+            - pre-build
+      - api:
+          <<: *workflow
+          requires:
+            - contracts
+      - react:
+          <<: *workflow
+          requires:
+            - pre-build
+      - e2e:
+          <<: *workflow
+          requires:
+            - pre-build
+
+

@@ -1,0 +1,11 @@
+# See https://help.github.com/ignore-files/ for more about ignoring files.
+
+# misc
+.DS_Store
+
+!*.gitkeep
+
+node_modules
+*/node_modules
+
+*.swp

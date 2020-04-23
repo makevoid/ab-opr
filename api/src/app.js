@@ -3,10 +3,8 @@ const config = require('config')
 
 const PORT = config.get('PORT')
 
-// TODO: remove contractAddresses
-
-const runApp = async contractAddresses => {
-  const app = await createServer(contractAddresses)
+const runApp = async () => {
+  const app = await createServer()
   await app.listen(PORT)
 }
 

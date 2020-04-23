@@ -20,11 +20,11 @@ const { web3 } = require('./util/web3')
 
 const { healthcheck } = require('./healthcheck')
 
-const createServer = async _ => {
+const createServer = async () => {
 
   logger.debug('Creating server...')
 
-  //const [ from ] = await web3.eth.getAccounts()
+  // const [ from ] = await web3.eth.getAccounts()
 
   const app = new Koa()
   app

@@ -1,6 +1,0 @@
-{
-  "contracts": {
-  },
-  "addressBook": {
-  }
-}

@@ -23,15 +23,4 @@ describe(`GET ${URL}`, () => {
     expect(status).toEqual(200)
     expect(body.message).toEqual(expect.any(String))
   })
-
-  it('can set the value', async () => {
-    const { status, body } = await request(app)
-      .post(URL)
-      .set('Content-Type', 'application/json')
-      .send({ message: 'hello test' })
-      .expect('Content-Type', /json/)
-
-    expect(status).toEqual(200)
-    expect(body.success).toEqual(true)
-  })
 })

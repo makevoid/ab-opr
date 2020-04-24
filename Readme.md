@@ -2,7 +2,7 @@
 
 ### Spike project
 
-Prototype (v0.7) - Features - Browser and Mobile app to register digital signatures to a blockchain based backend
+Prototype (v0.7) - Features - Browser and Mobile app to register hashes and digital signatures to a blockchain based backend
 
 - User can register
 - User can see a list of digital signatures

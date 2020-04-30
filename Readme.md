@@ -1,13 +1,7 @@
-# AB-OPR
+# launchpad.js 
+### no parity private deployment - forked from ab-opr initial version
 
-### Spike project
-
-Prototype (v0.7) - Features - Browser and Mobile app to register hashes and digital signatures to a blockchain based backend
-
-- User can register
-- User can see a list of digital signatures
-- User can register a new digital signatures
-- Admin can see a list of all digital signatures
+project boilerplate
 
 
 ### Directory structure:
